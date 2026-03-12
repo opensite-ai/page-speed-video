@@ -1,0 +1,28 @@
+# Source files
+src/
+scripts/
+
+# Development files
+.eslintrc.cjs
+.gitignore
+commitlint.config.cjs
+tsconfig.json
+vite.umd.config.ts
+vitest.config.ts
+
+# Documentation (kept: README.md, LICENSE, CHANGELOG.md)
+PAGE_SPEED_VIDEO_BUILD_GUIDE.md
+
+# Git
+.git/
+.github/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# OS
+.DS_Store

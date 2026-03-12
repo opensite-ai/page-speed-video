@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>@page-speed/video CDN Example</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    video {
+      width: 100%;
+      max-width: 640px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>@page-speed/video CDN Example</h1>
+
+  <div id="root"></div>
+
+  <!-- Load React -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Load @page-speed/video UMD build -->
+  <script src="https://cdn.jsdelivr.net/npm/@page-speed/video@0.1.0/dist/browser/page-speed-video.umd.js"></script>
+
+  <script>
+    // Access the Video component from the global PageSpeedVideo object
+    const { Video } = PageSpeedVideo;
+
+    // Create a Video element using React.createElement
+    const videoElement = React.createElement(Video, {
+      src: 'https://example.com/video.mp4',
+      poster: 'https://example.com/poster.jpg',
+      controls: true,
+      style: { width: '100%' }
+    });
+
+    // Render to the DOM
+    ReactDOM.render(videoElement, document.getElementById('root'));
+  </script>
+</body>
+</html>

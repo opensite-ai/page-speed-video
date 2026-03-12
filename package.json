@@ -1,0 +1,102 @@
+{
+  "name": "@page-speed/video",
+  "version": "0.1.0",
+  "description": "Performance-optimized React Video component with HLS streaming support. Drop-in video implementation of web.dev best practices with zero configuration.",
+  "keywords": [
+    "react",
+    "hooks",
+    "performance",
+    "page-speed",
+    "optimization",
+    "hls",
+    "streaming",
+    "video",
+    "web.dev",
+    "lighthouse",
+    "pagespeed",
+    "seo",
+    "tree-shakeable"
+  ],
+  "homepage": "https://github.com/opensite-ai/page-speed-video#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/opensite-ai/page-speed-video.git"
+  },
+  "bugs": {
+    "url": "https://github.com/opensite-ai/page-speed-video/issues"
+  },
+  "author": "OpenSite AI (https://opensite.ai)",
+  "license": "BSD-3-Clause",
+  "private": false,
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./core": {
+      "import": "./dist/core/index.js",
+      "require": "./dist/core/index.cjs",
+      "types": "./dist/core/index.d.ts"
+    },
+    "./core/video": {
+      "import": "./dist/core/Video.js",
+      "require": "./dist/core/Video.cjs",
+      "types": "./dist/core/Video.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "pnpm run build:lib && pnpm run build:umd",
+    "build:lib": "tsc && node scripts/emit-cjs.js",
+    "build:umd": "vite build --config vite.umd.config.ts",
+    "build:watch": "tsc -w",
+    "clean": "rimraf dist",
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "vitest run",
+    "bundle-analysis": "node scripts/analyze-bundle.js || true",
+    "prepare": "husky",
+    "prepack": "pnpm run build",
+    "prepublishOnly": "pnpm run build && pnpm run test"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0"
+  },
+  "dependencies": {
+    "hls.js": "^1.5.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^20.17.6",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.0",
+    "@typescript-eslint/parser": "^8.46.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^9.37.0",
+    "happy-dom": "^15.11.7",
+    "husky": "^9.1.7",
+    "terser": "^5.44.0",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.20",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.24.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
