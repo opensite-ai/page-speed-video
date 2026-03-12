@@ -148,6 +148,32 @@ Extends all native `<video>` element props, plus:
 - **Safari/iOS**: Native HLS support
 - **Fallback**: Progressive MP4 for unsupported browsers
 
+## Testing
+
+The package includes a comprehensive test suite with **129 passing tests** covering all functionality.
+
+### Run Tests
+```bash
+pnpm test
+```
+
+### Run Tests with Coverage
+```bash
+pnpm test -- --coverage
+```
+
+### Test Coverage
+- ✅ Video component (19 tests)
+- ✅ VideoDefaults component (9 tests)
+- ✅ Transform API client (16 tests)
+- ✅ HLS hook (12 tests)
+- ✅ MP4 fallback logic (26 tests)
+- ✅ Polling strategy (17 tests)
+- ✅ Poster optimization (13 tests)
+- ✅ Integration smoke tests (17 tests)
+
+See [TEST_DOCUMENTATION.md](./TEST_DOCUMENTATION.md) for detailed test documentation.
+
 ## License
 
 BSD-3-Clause
