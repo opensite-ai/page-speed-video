@@ -49,5 +49,9 @@ export { getOptimizedPosterUrl } from "./poster/getOptimizedPosterUrl.js";
 export type { GetOptimizedPosterOptions } from "./poster/getOptimizedPosterUrl.js";
 
 // Re-export specific items for clarity and CDN usage
-export { Video, setDefaultOptixFlowApiKey, VideoDefaults } from "./core/index.js";
+export { Video, VideoPlayer, setDefaultOptixFlowApiKey, VideoDefaults } from "./core/index.js";
 export type { VideoDefaultsProps } from "./core/index.js";
+
+// Skin integration helpers
+export { VideoWithSkin } from "./skins/withVideoSkin.js";
+export type { VideoWithSkinProps, VideoSkinDefinition } from "./skins/withVideoSkin.js";

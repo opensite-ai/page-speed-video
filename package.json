@@ -1,6 +1,6 @@
 {
   "name": "@page-speed/video",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Performance-optimized React Video component with HLS streaming support. Drop-in video implementation of web.dev best practices with zero configuration.",
   "keywords": [
     "react",
@@ -54,6 +54,16 @@
       "import": "./dist/core/Video.js",
       "require": "./dist/core/Video.cjs",
       "types": "./dist/core/Video.d.ts"
+    },
+    "./core/video-player": {
+      "import": "./dist/core/VideoPlayer.js",
+      "require": "./dist/core/VideoPlayer.cjs",
+      "types": "./dist/core/VideoPlayer.d.ts"
+    },
+    "./skins": {
+      "import": "./dist/skins/withVideoSkin.js",
+      "require": "./dist/skins/withVideoSkin.cjs",
+      "types": "./dist/skins/withVideoSkin.d.ts"
     }
   },
   "scripts": {

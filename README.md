@@ -2,6 +2,8 @@
 
 Performance-optimized React Video component with HLS streaming support. Drop-in video implementation of web.dev best practices with zero configuration.
 
+[![](https://data.jsdelivr.com/v1/package/npm/@page-speed/video/badge)](https://www.jsdelivr.com/package/npm/@page-speed/video)
+
 ## Features
 
 - **HLS Streaming**: Automatic adaptive bitrate streaming with hls.js
