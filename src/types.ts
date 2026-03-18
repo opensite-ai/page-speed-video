@@ -25,6 +25,31 @@ export interface VideoProps extends Omit<React.VideoHTMLAttributes<HTMLVideoElem
   onPlaybackStateChange?: (state: PlaybackState) => void;
   /** Enable debug logging */
   debug?: boolean;
+  /**
+   * Skin classes for custom controls (from @page-speed/skins)
+   * When provided, enables custom controls with skin styling
+   */
+  skinClasses?: {
+    container?: string;
+    video?: string;
+    controlsBar?: string;
+    playButton?: string;
+    timeline?: string;
+    timelineProgress?: string;
+    timelineBuffered?: string;
+    timeText?: string;
+    volumeControl?: string;
+    fullscreenButton?: string;
+    settingsButton?: string;
+    loadingSpinner?: string;
+    playOverlay?: string;
+    playOverlayButton?: string;
+  };
+  /**
+   * CSS custom properties from skin tokens
+   * When provided with skinClasses, enables custom controls
+   */
+  skinStyle?: Record<string, string>;
 }
 
 export interface TransformResponse {
