@@ -1,6 +1,6 @@
 {
   "name": "@page-speed/video",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Performance-optimized React Video component with HLS streaming support. Drop-in video implementation of web.dev best practices with zero configuration.",
   "keywords": [
     "react",

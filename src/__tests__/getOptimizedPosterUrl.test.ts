@@ -7,14 +7,14 @@ describe('getOptimizedPosterUrl', () => {
   });
 
   describe('Basic Functionality', () => {
-    it('should return the original URL', () => {
+    it('should return the original URL without API key', () => {
       const url = 'https://example.com/poster.jpg';
       const result = getOptimizedPosterUrl({ url });
 
       expect(result).toBe(url);
     });
 
-    it('should return URL without API key', () => {
+    it('should return original URL when API key is undefined', () => {
       const url = 'https://example.com/poster.jpg';
       const result = getOptimizedPosterUrl({
         url,
@@ -24,15 +24,67 @@ describe('getOptimizedPosterUrl', () => {
       expect(result).toBe(url);
     });
 
-    it('should return URL with API key (passthrough for now)', () => {
+    it('should generate OptixFlow URL with API key', () => {
       const url = 'https://example.com/poster.jpg';
       const result = getOptimizedPosterUrl({
         url,
         apiKey: 'test-api-key',
       });
 
-      // Currently returns original URL (optimization not yet implemented)
-      expect(result).toBe(url);
+      expect(result).toContain('https://octane.cdn.ing/api/v1/images/transform?');
+      expect(result).toContain('url=https%3A%2F%2Fexample.com%2Fposter.jpg');
+      expect(result).toContain('apiKey=test-api-key');
+      expect(result).toContain('w=1280'); // default width
+      expect(result).toContain('h=720');  // default height
+      expect(result).toContain('q=75');   // default quality
+      expect(result).toContain('f=jpeg'); // default format
+      expect(result).toContain('fit=cover'); // default fit
+    });
+
+    it('should use custom dimensions', () => {
+      const url = 'https://example.com/poster.jpg';
+      const result = getOptimizedPosterUrl({
+        url,
+        apiKey: 'test-api-key',
+        width: 1920,
+        height: 1080,
+      });
+
+      expect(result).toContain('w=1920');
+      expect(result).toContain('h=1080');
+    });
+
+    it('should use custom quality', () => {
+      const url = 'https://example.com/poster.jpg';
+      const result = getOptimizedPosterUrl({
+        url,
+        apiKey: 'test-api-key',
+        quality: 90,
+      });
+
+      expect(result).toContain('q=90');
+    });
+
+    it('should use custom format', () => {
+      const url = 'https://example.com/poster.jpg';
+      const result = getOptimizedPosterUrl({
+        url,
+        apiKey: 'test-api-key',
+        format: 'webp',
+      });
+
+      expect(result).toContain('f=webp');
+    });
+
+    it('should use custom objectFit', () => {
+      const url = 'https://example.com/poster.jpg';
+      const result = getOptimizedPosterUrl({
+        url,
+        apiKey: 'test-api-key',
+        objectFit: 'contain',
+      });
+
+      expect(result).toContain('fit=contain');
     });
   });
 
@@ -47,13 +99,21 @@ describe('getOptimizedPosterUrl', () => {
       });
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('OptixFlow optimization available')
+        '[getOptimizedPosterUrl] Generated OptixFlow URL:',
+        expect.objectContaining({
+          original: 'https://example.com/poster.jpg',
+          optimized: expect.stringContaining('octane.cdn.ing'),
+          dimensions: '1280x720',
+          format: 'jpeg',
+          quality: 75,
+          objectFit: 'cover',
+        })
       );
 
       consoleLogSpy.mockRestore();
     });
 
-    it('should not log when API key is not provided', () => {
+    it('should log when no API key is provided with debug enabled', () => {
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       getOptimizedPosterUrl({
@@ -61,7 +121,10 @@ describe('getOptimizedPosterUrl', () => {
         debug: true,
       });
 
-      expect(consoleLogSpy).not.toHaveBeenCalled();
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[getOptimizedPosterUrl] No API key provided, using original URL'
+      );
+
       consoleLogSpy.mockRestore();
     });
 
@@ -80,57 +143,101 @@ describe('getOptimizedPosterUrl', () => {
   });
 
   describe('URL Formats', () => {
-    it('should handle absolute URLs', () => {
+    it('should handle absolute URLs without API key', () => {
       const url = 'https://example.com/poster.jpg';
       const result = getOptimizedPosterUrl({ url });
       expect(result).toBe(url);
     });
 
-    it('should handle URLs with query parameters', () => {
+    it('should optimize absolute URLs with API key', () => {
+      const url = 'https://example.com/poster.jpg';
+      const result = getOptimizedPosterUrl({ url, apiKey: 'test-key' });
+      expect(result).toContain('octane.cdn.ing');
+    });
+
+    it('should encode URLs with query parameters', () => {
       const url = 'https://example.com/poster.jpg?version=1&quality=high';
-      const result = getOptimizedPosterUrl({ url });
-      expect(result).toBe(url);
+      const result = getOptimizedPosterUrl({ url, apiKey: 'test-key' });
+      expect(result).toContain('url=https%3A%2F%2Fexample.com%2Fposter.jpg%3Fversion%3D1%26quality%3Dhigh');
     });
 
-    it('should handle URLs with hash fragments', () => {
-      const url = 'https://example.com/poster.jpg#section';
-      const result = getOptimizedPosterUrl({ url });
-      expect(result).toBe(url);
-    });
-
-    it('should handle data URLs', () => {
+    it('should handle data URLs without optimization', () => {
       const url = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-      const result = getOptimizedPosterUrl({ url });
+      const result = getOptimizedPosterUrl({ url, apiKey: 'test-key' });
       expect(result).toBe(url);
     });
 
-    it('should handle relative URLs', () => {
+    it('should handle blob URLs without optimization', () => {
+      const url = 'blob:https://example.com/12345';
+      const result = getOptimizedPosterUrl({ url, apiKey: 'test-key' });
+      expect(result).toBe(url);
+    });
+
+    it('should optimize relative URLs with API key', () => {
       const url = '/images/poster.jpg';
-      const result = getOptimizedPosterUrl({ url });
-      expect(result).toBe(url);
+      const result = getOptimizedPosterUrl({ url, apiKey: 'test-key' });
+      expect(result).toContain('octane.cdn.ing');
+      expect(result).toContain('url=%2Fimages%2Fposter.jpg');
     });
 
-    it('should handle empty string', () => {
+    it('should handle empty string without API key', () => {
       const url = '';
       const result = getOptimizedPosterUrl({ url });
       expect(result).toBe(url);
     });
   });
 
-  describe('Future Optimization Readiness', () => {
-    it('should be ready to implement OptixFlow integration', () => {
-      // This test documents the expected API structure for future implementation
+  describe('OptixFlow Integration', () => {
+    it('should generate complete OptixFlow URL with all parameters', () => {
       const url = 'https://example.com/poster.jpg';
       const apiKey = 'test-api-key';
 
-      const result = getOptimizedPosterUrl({ url, apiKey });
+      const result = getOptimizedPosterUrl({
+        url,
+        apiKey,
+        width: 1920,
+        height: 1080,
+        quality: 85,
+        format: 'webp',
+        objectFit: 'contain',
+      });
 
-      // Currently returns original URL
-      expect(result).toBe(url);
+      expect(result).toContain('https://octane.cdn.ing/api/v1/images/transform?');
+      expect(result).toContain('url=https%3A%2F%2Fexample.com%2Fposter.jpg');
+      expect(result).toContain('w=1920');
+      expect(result).toContain('h=1080');
+      expect(result).toContain('q=85');
+      expect(result).toContain('f=webp');
+      expect(result).toContain('fit=contain');
+      expect(result).toContain('apiKey=test-api-key');
+    });
 
-      // When implemented, it would return an optimized URL like:
-      // expect(result).toContain('optixflow');
-      // expect(result).toContain(apiKey);
+    it('should support all image formats', () => {
+      const formats: Array<'avif' | 'webp' | 'jpeg' | 'png'> = ['avif', 'webp', 'jpeg', 'png'];
+
+      formats.forEach(format => {
+        const result = getOptimizedPosterUrl({
+          url: 'https://example.com/poster.jpg',
+          apiKey: 'test-key',
+          format,
+        });
+
+        expect(result).toContain(`f=${format}`);
+      });
+    });
+
+    it('should support all objectFit modes', () => {
+      const modes: Array<'cover' | 'contain' | 'fill'> = ['cover', 'contain', 'fill'];
+
+      modes.forEach(objectFit => {
+        const result = getOptimizedPosterUrl({
+          url: 'https://example.com/poster.jpg',
+          apiKey: 'test-key',
+          objectFit,
+        });
+
+        expect(result).toContain(`fit=${objectFit}`);
+      });
     });
   });
 });

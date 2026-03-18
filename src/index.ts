@@ -46,7 +46,7 @@ export { pollForReadiness } from "./processing/pollForReadiness.js";
 export type { PollForReadinessOptions } from "./processing/pollForReadiness.js";
 
 export { getOptimizedPosterUrl } from "./poster/getOptimizedPosterUrl.js";
-export type { GetOptimizedPosterOptions } from "./poster/getOptimizedPosterUrl.js";
+export type { GetOptimizedPosterOptions, PosterImageFormat } from "./poster/getOptimizedPosterUrl.js";
 
 // Re-export specific items for clarity and CDN usage
 export { Video, VideoPlayer, setDefaultOptixFlowApiKey, VideoDefaults } from "./core/index.js";
