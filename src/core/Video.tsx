@@ -93,15 +93,29 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
     });
   }, [poster, resolvedApiKey, debug]);
 
-  // Fetch master playlist if not provided
+  // Determine if we should call transform API
+  const shouldCallTransformApi = useMemo(() => {
+    // If no OptixFlow API key, skip transform API
+    if (!resolvedApiKey) return false;
+
+    // If masterPlaylistUrl or fallbackSrc already provided, skip transform
+    if (providedMasterPlaylistUrl || fallbackSrc) return false;
+
+    // If only src provided, call transform API
+    return !!src;
+  }, [resolvedApiKey, providedMasterPlaylistUrl, fallbackSrc, src]);
+
+  // Fetch master playlist if needed
   useEffect(() => {
+    // If masterPlaylistUrl explicitly provided, use it
     if (providedMasterPlaylistUrl) {
       setResolvedMasterPlaylistUrl(providedMasterPlaylistUrl);
       setTransformError(null);
       return;
     }
 
-    if (!src) {
+    // If we shouldn't call transform API, clear state
+    if (!shouldCallTransformApi) {
       setResolvedMasterPlaylistUrl(null);
       setTransformError(null);
       return;
@@ -112,17 +126,17 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
     (async () => {
       try {
         const result = await getHlsMasterPlaylist({
-          src,
+          src: src!,
           transformBaseUrl,
           debug,
         });
 
         if (!mounted) return;
 
-        // If transform fails or no masterPlaylistUrl, fallback to src
+        // If transform fails or no masterPlaylistUrl, will fallback to src
         if (result.error || !result.masterPlaylistUrl) {
           if (debug) {
-            console.log("[Video] Transform failed, will use src as progressive:", result.error);
+            console.log("[Video] Transform failed, will use fallback chain:", result.error);
           }
           setTransformError(result.error || "Transform API unavailable");
           setResolvedMasterPlaylistUrl(null);
@@ -153,7 +167,7 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
         if (!mounted) return;
         const errorMessage = err instanceof Error ? err.message : String(err);
         if (debug) {
-          console.log("[Video] Transform error, will use src as progressive:", errorMessage);
+          console.log("[Video] Transform error, will use fallback chain:", errorMessage);
         }
         setTransformError(errorMessage);
         setResolvedMasterPlaylistUrl(null);
@@ -163,7 +177,7 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
     return () => {
       mounted = false;
     };
-  }, [src, providedMasterPlaylistUrl, transformBaseUrl, processingStrategy, debug]);
+  }, [src, providedMasterPlaylistUrl, transformBaseUrl, processingStrategy, debug, shouldCallTransformApi]);
 
   // Attach HLS
   const { state: hlsState, error: hlsError } = useHls({
@@ -189,25 +203,42 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
     [forwardedRef],
   );
 
-  // Determine video source
+  // Determine video source with proper priority chain
+  // With OptixFlow API key:
+  //   1. Try masterPlaylistUrl (HLS) if provided
+  //   2. If HLS fails, try fallbackSrc
+  //   3. If no fallbackSrc, try src
+  // Without OptixFlow API key:
+  //   1. Use src directly (no transform)
+
   let videoSrc: string | undefined;
-  if (useFallback && fallbackSrc) {
-    videoSrc = fallbackSrc;
-  } else if (!resolvedMasterPlaylistUrl && src) {
-    // If no HLS (either transform failed or not attempted), use original src as progressive
-    videoSrc = src;
+
+  if (resolvedMasterPlaylistUrl && hlsState !== "error") {
+    // HLS is available and working - let HLS handle playback
+    // Don't set src attribute (HLS.js manages the source)
+    videoSrc = undefined;
+  } else if (resolvedMasterPlaylistUrl && hlsState === "error") {
+    // HLS failed - use fallback chain
+    videoSrc = fallbackSrc || src;
+  } else {
+    // No HLS - use fallback chain directly
+    videoSrc = fallbackSrc || src;
   }
 
   if (debug) {
-    console.log("[Video] State:", {
+    console.log("[Video] Playback decision:", {
+      resolvedMasterPlaylistUrl,
       hlsState,
       useFallback,
-      videoSrc,
-      resolvedMasterPlaylistUrl,
+      finalVideoSrc: videoSrc,
+      fallbackSrc,
+      src,
       transformError,
       hlsError,
       isPolling,
       useCustomControls,
+      shouldCallTransformApi,
+      hasOptixFlowApiKey: !!resolvedApiKey,
     });
   }
 
