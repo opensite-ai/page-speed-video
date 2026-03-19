@@ -203,26 +203,64 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
     [forwardedRef],
   );
 
-  // Determine video source with proper priority chain
-  // With OptixFlow API key:
-  //   1. Try masterPlaylistUrl (HLS) if provided
-  //   2. If HLS fails, try fallbackSrc
-  //   3. If no fallbackSrc, try src
-  // Without OptixFlow API key:
-  //   1. Use src directly (no transform)
+  // Handle video error events to implement fallback chain
+  const [currentSourceIndex, setCurrentSourceIndex] = useState(0);
+  const [hasError, setHasError] = useState(false);
 
+  // Build fallback source array (in priority order)
+  const fallbackSources = useMemo(() => {
+    const sources: string[] = [];
+    if (fallbackSrc) sources.push(fallbackSrc);
+    if (src) sources.push(src);
+    return sources;
+  }, [fallbackSrc, src]);
+
+  // Handle video error - try next source in fallback chain
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleError = () => {
+      if (debug) {
+        console.log("[Video] Error loading source, trying next fallback");
+      }
+
+      // If there are more sources to try, move to next one
+      if (currentSourceIndex < fallbackSources.length - 1) {
+        setCurrentSourceIndex(prev => prev + 1);
+        setHasError(false);
+      } else {
+        setHasError(true);
+        if (debug) {
+          console.log("[Video] All sources failed");
+        }
+      }
+    };
+
+    video.addEventListener("error", handleError);
+    return () => video.removeEventListener("error", handleError);
+  }, [currentSourceIndex, fallbackSources.length, debug]);
+
+  // Reset source index when sources change
+  useEffect(() => {
+    setCurrentSourceIndex(0);
+    setHasError(false);
+  }, [fallbackSrc, src]);
+
+  // Determine video source with proper priority chain
+  // Priority: HLS (masterPlaylistUrl) > fallbackSrc > src
   let videoSrc: string | undefined;
 
   if (resolvedMasterPlaylistUrl && hlsState !== "error") {
-    // HLS is available and working - let HLS handle playback
-    // Don't set src attribute (HLS.js manages the source)
-    videoSrc = undefined;
+    // HLS is available and attempting to load/play
+    // Set fallback src in case HLS fails
+    videoSrc = fallbackSources[currentSourceIndex];
   } else if (resolvedMasterPlaylistUrl && hlsState === "error") {
-    // HLS failed - use fallback chain
-    videoSrc = fallbackSrc || src;
+    // HLS explicitly failed - use fallback chain
+    videoSrc = fallbackSources[currentSourceIndex];
   } else {
     // No HLS - use fallback chain directly
-    videoSrc = fallbackSrc || src;
+    videoSrc = fallbackSources[currentSourceIndex];
   }
 
   if (debug) {
@@ -231,8 +269,9 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
       hlsState,
       useFallback,
       finalVideoSrc: videoSrc,
-      fallbackSrc,
-      src,
+      currentSourceIndex,
+      fallbackSources,
+      hasError,
       transformError,
       hlsError,
       isPolling,
@@ -379,14 +418,13 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
         ref={mergedRef}
         poster={optimizedPoster}
         controls={controls ?? preferNativeControls}
-        src={videoSrc}
         className={className}
         style={style}
         onClick={handleVideoClick}
       >
-        {useFallback && fallbackSrc && (
-          <source src={fallbackSrc} type="video/mp4" />
-        )}
+        {/* Fallback sources - browser tries each in order if previous fails */}
+        {fallbackSrc && <source src={fallbackSrc} type="video/mp4" />}
+        {src && fallbackSrc !== src && <source src={src} type="video/mp4" />}
         {restProps.children}
       </video>
     );
@@ -409,13 +447,12 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
         ref={mergedRef}
         poster={optimizedPoster}
         controls={false}
-        src={videoSrc}
         className={skinClasses.video || className || "w-full h-full object-contain"}
         onClick={togglePlay}
       >
-        {useFallback && fallbackSrc && (
-          <source src={fallbackSrc} type="video/mp4" />
-        )}
+        {/* Fallback sources - browser tries each in order if previous fails */}
+        {fallbackSrc && <source src={fallbackSrc} type="video/mp4" />}
+        {src && fallbackSrc !== src && <source src={src} type="video/mp4" />}
         {restProps.children}
       </video>
 
