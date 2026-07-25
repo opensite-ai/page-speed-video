@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useHls } from "../hls/useHls";
 
 // ---------------------------------------------------------------------------
@@ -11,6 +11,7 @@ vi.mock("hls.js", () => {
     on: vi.fn(),
     loadSource: vi.fn(),
     attachMedia: vi.fn(),
+    startLoad: vi.fn(),
     destroy: vi.fn(),
   }));
 
@@ -21,6 +22,7 @@ vi.mock("hls.js", () => {
     MANIFEST_PARSED: "hlsManifestParsed",
     LEVEL_LOADED: "hlsLevelLoaded",
     FRAG_LOADED: "hlsFragLoaded",
+    FRAG_BUFFERED: "hlsFragBuffered",
     LEVEL_SWITCHED: "hlsLevelSwitched",
     ERROR: "hlsError",
   };
@@ -399,6 +401,93 @@ describe("useHls Hook", () => {
 
       // The hls.js constructor should not have been invoked for native path.
       expect(Hls).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // High-quality HLS startup
+  // -------------------------------------------------------------------------
+
+  describe("High-quality HLS startup", () => {
+    it("disables the lowest-level bandwidth test and pauses fragment loading", async () => {
+      global.fetch = vi.fn().mockResolvedValue(successfulProbe());
+      videoElement.canPlayType = vi.fn().mockReturnValue("");
+
+      const { default: Hls } = await import("hls.js");
+      (Hls.isSupported as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      renderHook(() =>
+        useHls({
+          masterPlaylistUrl: "https://example.com/master.m3u8",
+          videoRef,
+        }),
+      );
+
+      await waitFor(() => expect(Hls).toHaveBeenCalled());
+
+      expect(Hls).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoStartLoad: false,
+          testBandwidth: false,
+        }),
+      );
+    });
+
+    it("buffers the highest-resolution opening fragment before looped playback is ready", async () => {
+      global.fetch = vi.fn().mockResolvedValue(successfulProbe());
+      videoElement.canPlayType = vi.fn().mockReturnValue("");
+      videoElement.loop = true;
+
+      const { default: Hls } = await import("hls.js");
+      (Hls.isSupported as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      const { result } = renderHook(() =>
+        useHls({
+          masterPlaylistUrl: "https://example.com/master.m3u8",
+          videoRef,
+        }),
+      );
+
+      await waitFor(() => expect(Hls).toHaveBeenCalled());
+
+      const hlsInstance = (
+        Hls as unknown as ReturnType<typeof vi.fn>
+      ).mock.results[0].value as {
+        on: ReturnType<typeof vi.fn>;
+        startLoad: ReturnType<typeof vi.fn>;
+        startLevel: number;
+      };
+      const manifestParsedHandler = hlsInstance.on.mock.calls.find(
+        ([event]) => event === Hls.Events.MANIFEST_PARSED,
+      )?.[1] as ((event: string, data: unknown) => void) | undefined;
+      const fragmentBufferedHandler = hlsInstance.on.mock.calls.find(
+        ([event]) => event === Hls.Events.FRAG_BUFFERED,
+      )?.[1] as ((event: string, data: unknown) => void) | undefined;
+
+      expect(manifestParsedHandler).toBeDefined();
+      expect(fragmentBufferedHandler).toBeDefined();
+
+      act(() => {
+        manifestParsedHandler?.("hlsManifestParsed", {
+          levels: [
+            { width: 640, height: 360, bitrate: 800_000 },
+            { width: 1920, height: 1080, bitrate: 5_000_000 },
+            { width: 1280, height: 720, bitrate: 2_500_000 },
+          ],
+          firstLevel: 0,
+        });
+      });
+
+      expect(hlsInstance.startLevel).toBe(1);
+      expect(hlsInstance.startLoad).toHaveBeenCalledTimes(1);
+      expect(result.current.state).toBe("loading");
+
+      act(() => {
+        fragmentBufferedHandler?.("hlsFragBuffered", {
+          frag: { type: "main", level: 1 },
+        });
+      });
+
+      expect(result.current.state).toBe("ready");
     });
   });
 

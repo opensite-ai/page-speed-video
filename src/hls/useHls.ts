@@ -7,9 +7,39 @@ type HlsInstance = InstanceType<HlsType>;
 
 const TAG = "[useHls]";
 
+type HlsQualityLevel = {
+  width?: number;
+  height?: number;
+  bitrate?: number;
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Picks the highest-resolution variant, using bitrate as a tie-breaker.
+ * HLS manifests usually list levels from lowest to highest bitrate, but the
+ * order is not guaranteed, so compare the level metadata explicitly.
+ */
+function getHighestQualityLevelIndex(levels: HlsQualityLevel[]): number {
+  return levels.reduce((highestIndex, level, index) => {
+    if (highestIndex === -1) return index;
+
+    const highest = levels[highestIndex];
+    const resolution = (level.width ?? 0) * (level.height ?? 0);
+    const highestResolution =
+      (highest.width ?? 0) * (highest.height ?? 0);
+
+    if (resolution !== highestResolution) {
+      return resolution > highestResolution ? index : highestIndex;
+    }
+
+    return (level.bitrate ?? 0) > (highest.bitrate ?? 0)
+      ? index
+      : highestIndex;
+  }, -1);
+}
 
 /**
  * Probes a URL with a GET request and returns a structured diagnostic object.
@@ -493,6 +523,12 @@ export function useHls(options: UseHlsOptions): UseHlsResult {
         hlsInstance = new Hls({
           enableWorker: true,
           lowLatencyMode: false,
+          // Load the manifest first so the opening fragment can be selected
+          // from the highest-resolution variant before playback begins.
+          autoStartLoad: false,
+          // hls.js otherwise downloads the lowest-level fragment as a bandwidth
+          // test. That pixelated fragment is retained and replayed on every loop.
+          testBandwidth: false,
           // Surface more detail in debug mode
           debug: !!debug,
         });
@@ -505,22 +541,35 @@ export function useHls(options: UseHlsOptions): UseHlsResult {
         // ---- Event: manifest parsed ----
         hlsInstance.on(Hls.Events.MANIFEST_PARSED, (_evt, data) => {
           const d = data as unknown as {
-            levels?: unknown[];
+            levels?: HlsQualityLevel[];
             firstLevel?: number;
             audioTracks?: unknown[];
             subtitleTracks?: unknown[];
           };
+          const levels = d.levels ?? [];
+          const highestQualityLevel = getHighestQualityLevelIndex(levels);
+
           console.log(
             `${TAG} Manifest parsed successfully.\n` +
               `  URL            : ${masterPlaylistUrl}\n` +
-              `  Levels (quality variants) : ${d.levels?.length ?? "(unknown)"}\n` +
+              `  Levels (quality variants) : ${levels.length}\n` +
               `  First level    : ${d.firstLevel ?? "(unknown)"}\n` +
+              `  Startup level  : ${highestQualityLevel >= 0 ? highestQualityLevel : "(automatic)"}\n` +
               `  Audio tracks   : ${d.audioTracks?.length ?? 0}\n` +
               `  Subtitle tracks: ${d.subtitleTracks?.length ?? 0}`,
           );
-          if (mounted) {
-            updateState("ready");
+
+          if (!mounted || !hlsInstance) {
+            return;
           }
+
+          if (highestQualityLevel >= 0) {
+            hlsInstance.startLevel = highestQualityLevel;
+          }
+
+          // startLevel only affects the opening fragment. Subsequent fragments
+          // continue to use hls.js adaptive bitrate selection.
+          hlsInstance.startLoad();
         });
 
         // ---- Event: level loaded (variant playlist) ----
@@ -561,6 +610,30 @@ export function useHls(options: UseHlsOptions): UseHlsResult {
               `  SN             : ${d.frag?.sn ?? "?"} | level: ${d.frag?.level ?? "?"}\n` +
               `  Duration       : ${d.frag?.duration ?? "?"}s`,
           );
+        });
+
+        // A high-quality opening fragment is now appended and available for
+        // playback. Until this point an autoplaying video keeps its poster (when
+        // supplied) or remains on its unloaded frame instead of showing the
+        // lowest-quality bandwidth-test fragment.
+        let hasBufferedOpeningFragment = false;
+        hlsInstance.on(Hls.Events.FRAG_BUFFERED, (_evt, data) => {
+          if (hasBufferedOpeningFragment) return;
+
+          const d = data as unknown as {
+            frag?: {
+              type?: string;
+            };
+          };
+
+          if (d.frag?.type && d.frag.type !== "main") {
+            return;
+          }
+
+          hasBufferedOpeningFragment = true;
+          if (mounted) {
+            updateState("ready");
+          }
         });
 
         // ---- Event: level switched ----
