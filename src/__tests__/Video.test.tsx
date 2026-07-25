@@ -140,6 +140,26 @@ describe('Video Component', () => {
   });
 
   describe('Fallback Source', () => {
+    it('should not start a progressive fallback while explicit HLS is loading', () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+        () => new Promise<Response>(() => {})
+      );
+
+      render(
+        <Video
+          masterPlaylistUrl="https://example.com/master.m3u8"
+          fallbackSrc="https://example.com/fallback.mp4"
+          autoPlay
+          data-testid="video"
+        />
+      );
+
+      const video = screen.getByTestId('video') as HTMLVideoElement;
+      expect(video.querySelector('source')).toBeNull();
+
+      fetchSpy.mockRestore();
+    });
+
     it('should render source element with fallbackSrc when HLS fails', async () => {
       // Mock HLS failure by not supporting canPlayType
       HTMLVideoElement.prototype.canPlayType = vi.fn().mockReturnValue('');

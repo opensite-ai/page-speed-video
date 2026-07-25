@@ -263,6 +263,12 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
     videoSrc = fallbackSources[currentSourceIndex];
   }
 
+  // Do not let fallback <source> elements start progressive playback while an
+  // explicit HLS stream is still being prepared. Otherwise autoplay can paint
+  // the fallback before HLS attaches, producing a visible source/quality swap.
+  const shouldRenderFallbackSources =
+    !resolvedMasterPlaylistUrl || hlsState === "error";
+
   if (debug) {
     console.log("[Video] Playback decision:", {
       resolvedMasterPlaylistUrl,
@@ -423,8 +429,14 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
         onClick={handleVideoClick}
       >
         {/* Fallback sources - browser tries each in order if previous fails */}
-        {fallbackSrc && <source src={fallbackSrc} type="video/mp4" />}
-        {src && fallbackSrc !== src && <source src={src} type="video/mp4" />}
+        {shouldRenderFallbackSources && (
+          <>
+            {fallbackSrc && <source src={fallbackSrc} type="video/mp4" />}
+            {src && fallbackSrc !== src && (
+              <source src={src} type="video/mp4" />
+            )}
+          </>
+        )}
         {restProps.children}
       </video>
     );
@@ -451,8 +463,14 @@ const ModernVideo: React.FC<ForwardedVideoProps> = ({
         onClick={togglePlay}
       >
         {/* Fallback sources - browser tries each in order if previous fails */}
-        {fallbackSrc && <source src={fallbackSrc} type="video/mp4" />}
-        {src && fallbackSrc !== src && <source src={src} type="video/mp4" />}
+        {shouldRenderFallbackSources && (
+          <>
+            {fallbackSrc && <source src={fallbackSrc} type="video/mp4" />}
+            {src && fallbackSrc !== src && (
+              <source src={src} type="video/mp4" />
+            )}
+          </>
+        )}
         {restProps.children}
       </video>
 

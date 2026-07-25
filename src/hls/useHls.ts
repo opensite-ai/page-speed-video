@@ -42,6 +42,58 @@ function getHighestQualityLevelIndex(levels: HlsQualityLevel[]): number {
 }
 
 /**
+ * Resolves the highest-resolution media playlist from an HLS master playlist.
+ * Native HLS players do not expose a quality-selection API, so assigning the
+ * selected media playlist directly prevents their ABR ladder from restarting
+ * at the lowest rendition on every loop.
+ */
+function getHighestQualityVariantUrl(
+  masterPlaylistUrl: string,
+  manifestText: string | null,
+): string | null {
+  if (!manifestText) return null;
+
+  const lines = manifestText.split(/\r?\n/);
+  const variants: Array<HlsQualityLevel & { uri: string }> = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (!line.startsWith("#EXT-X-STREAM-INF:")) continue;
+
+    const attributes = line.slice("#EXT-X-STREAM-INF:".length);
+    const resolution = attributes.match(/RESOLUTION=(\d+)x(\d+)/i);
+    const bandwidth = attributes.match(
+      /(?:^|,)BANDWIDTH=(\d+)(?:,|$)/i,
+    );
+    const uri = lines
+      .slice(index + 1)
+      .map((candidate) => candidate.trim())
+      .find((candidate) => candidate.length > 0 && !candidate.startsWith("#"));
+
+    if (!uri) continue;
+
+    variants.push({
+      uri,
+      width: resolution ? Number.parseInt(resolution[1], 10) : undefined,
+      height: resolution ? Number.parseInt(resolution[2], 10) : undefined,
+      bitrate: bandwidth ? Number.parseInt(bandwidth[1], 10) : undefined,
+    });
+  }
+
+  const highestQualityLevel = getHighestQualityLevelIndex(variants);
+  if (highestQualityLevel < 0) return null;
+
+  try {
+    return new URL(
+      variants[highestQualityLevel].uri,
+      masterPlaylistUrl,
+    ).toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Probes a URL with a GET request and returns a structured diagnostic object.
  * This runs *before* hls.js touches the URL so we can surface HTTP-level
  * failures (404, 202 still-processing, CORS blocks, network errors, etc.)
@@ -52,6 +104,7 @@ async function probeUrl(url: string): Promise<{
   status: number | null;
   statusText: string | null;
   contentType: string | null;
+  bodyText: string | null;
   bodyPreview: string | null;
   corsBlocked: boolean;
   networkError: boolean;
@@ -60,17 +113,19 @@ async function probeUrl(url: string): Promise<{
   try {
     const response = await fetch(url, {
       method: "GET",
-      // Range header so we only pull the first 512 bytes of the body —
-      // enough to see whether it starts with "#EXTM3U" without downloading
-      // the entire payload.
-      headers: { Range: "bytes=0-511" },
+      // Master playlists are small text files. Cap the probe at 64 KiB so it
+      // contains every advertised quality variant without allowing an
+      // unexpected response to become an unbounded download.
+      headers: { Range: "bytes=0-65535" },
       // Don't follow redirects silently — we want to see the raw status.
       redirect: "follow",
     });
 
+    let bodyText: string | null = null;
     let bodyPreview: string | null = null;
     try {
       const raw = await response.text();
+      bodyText = raw;
       bodyPreview = raw.slice(0, 512).trim();
     } catch {
       // ignore body read errors
@@ -81,6 +136,7 @@ async function probeUrl(url: string): Promise<{
       status: response.status,
       statusText: response.statusText,
       contentType: response.headers.get("content-type"),
+      bodyText,
       bodyPreview,
       corsBlocked: false,
       networkError: false,
@@ -101,6 +157,7 @@ async function probeUrl(url: string): Promise<{
       status: null,
       statusText: null,
       contentType: null,
+      bodyText: null,
       bodyPreview: null,
       corsBlocked: isCors,
       networkError: !isCors,
@@ -466,10 +523,23 @@ export function useHls(options: UseHlsOptions): UseHlsResult {
         // Step 2: Attach HLS
         // ------------------------------------------------------------------
 
-        // Native HLS support (Safari / iOS)
+        // Native HLS does not expose a quality-selection API. Give it the
+        // highest advertised media playlist directly so it cannot restart its
+        // adaptive ladder at the lowest rendition on every loop.
         if (video.canPlayType("application/vnd.apple.mpegurl")) {
-          console.log(`${TAG} Using native HLS support (Safari/iOS path).`);
-          video.src = masterPlaylistUrl;
+          const highestQualityVariantUrl = getHighestQualityVariantUrl(
+            masterPlaylistUrl,
+            probe.bodyText,
+          );
+          const nativeSourceUrl =
+            highestQualityVariantUrl ?? masterPlaylistUrl;
+
+          console.log(
+            `${TAG} Using native HLS support.\n` +
+              `  Source URL      : ${nativeSourceUrl}\n` +
+              `  Quality pinned  : ${highestQualityVariantUrl ? "highest advertised rendition" : "no variant metadata available"}`,
+          );
+          video.src = nativeSourceUrl;
 
           // Listen for native media errors so they're surfaced even on Safari.
           const handleNativeError = () => {
@@ -486,7 +556,7 @@ export function useHls(options: UseHlsOptions): UseHlsResult {
                 `${TAG} Native HLS media error:\n` +
                   `  code    : ${readable}\n` +
                   `  message : ${me.message || "(none)"}\n` +
-                  `  url     : ${masterPlaylistUrl}`,
+                  `  url     : ${nativeSourceUrl}`,
               );
             }
           };

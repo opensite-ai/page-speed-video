@@ -7,8 +7,8 @@ Performance-optimized React Video component with HLS streaming support. Drop-in 
 ## Features
 
 - **HLS Streaming**: Automatic adaptive bitrate streaming with hls.js
-- **High-quality HLS Start**: Buffers the highest-resolution opening fragment before playback, then resumes adaptive bitrate selection
-- **Native HLS**: Safari/iOS use native HLS support (no extra dependencies)
+- **High-quality HLS Start**: Pins native HLS to the highest rendition; hls.js starts high before resuming adaptive selection
+- **Native HLS**: Native-capable browsers start on the highest advertised rendition
 - **Progressive Fallback**: MP4 fallback for unsupported browsers
 - **Transform API**: Automatic video transformation to HLS
 - **Poster Optimization**: OptixFlow integration for optimized poster images
@@ -148,7 +148,7 @@ Extends all native `<video>` element props, plus:
 ## Browser Support
 
 - **Modern Browsers**: Chrome, Firefox, Edge (via hls.js)
-- **Safari/iOS**: Native HLS support
+- **Safari/iOS**: Native HLS support with high-quality rendition selection
 - **Fallback**: Progressive MP4 for unsupported browsers
 
 ## Testing

@@ -382,7 +382,7 @@ describe("useHls Hook", () => {
       });
     });
 
-    it("should not import hls.js when native HLS is available", async () => {
+    it("should not construct hls.js when native HLS is available", async () => {
       global.fetch = vi.fn().mockResolvedValue(successfulProbe());
       videoElement.canPlayType = vi.fn().mockReturnValue("probably");
 
@@ -409,6 +409,40 @@ describe("useHls Hook", () => {
   // -------------------------------------------------------------------------
 
   describe("High-quality HLS startup", () => {
+    it("pins native HLS playback to the highest-resolution variant", async () => {
+      global.fetch = vi.fn().mockResolvedValue(
+        mockProbeResponse({
+          body: [
+            "#EXTM3U",
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360",
+            "rung_360p.m3u8",
+            "#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080",
+            "rung_1080p.m3u8",
+            "#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720",
+            "rung_720p.m3u8",
+          ].join("\n"),
+        }),
+      );
+      videoElement.canPlayType = vi.fn().mockReturnValue("probably");
+
+      const { default: Hls } = await import("hls.js");
+
+      renderHook(() =>
+        useHls({
+          masterPlaylistUrl: "https://example.com/master.m3u8",
+          videoRef,
+        }),
+      );
+
+      await waitFor(() =>
+        expect(videoElement.src).toBe(
+          "https://example.com/rung_1080p.m3u8",
+        ),
+      );
+
+      expect(Hls).not.toHaveBeenCalled();
+    });
+
     it("disables the lowest-level bandwidth test and pauses fragment loading", async () => {
       global.fetch = vi.fn().mockResolvedValue(successfulProbe());
       videoElement.canPlayType = vi.fn().mockReturnValue("");
